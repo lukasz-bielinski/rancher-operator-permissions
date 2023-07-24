@@ -78,6 +78,7 @@ type ClusterAssignmentReconciler struct {
 //+kubebuilder:rbac:groups=permissions.xddevelopment.com,resources=clusterassignments/finalizers,verbs=update
 //+kubebuilder:rbac:groups=management.cattle.io,resources=users,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=management.cattle.io,resources=clusters,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups=management.cattle.io,resources=clusterroletemplatebindings,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -142,12 +143,12 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	for clusterName, namespace := range clusters {
+	for clusterName := range clusters {
 		// Create a ClusterRoleTemplateBinding for each cluster the user should have access to.
 		binding := &managementv3.ClusterRoleTemplateBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      user.Name + "-" + clusterName,
-				Namespace: namespace,
+				Namespace: clusterName,
 			},
 			RoleTemplateName:  "cluster-owner",
 			UserName:          user.Name,

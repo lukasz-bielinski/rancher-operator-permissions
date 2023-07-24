@@ -135,6 +135,18 @@ rules:
 - apiGroups:
   - management.cattle.io
   resources:
+  - clusterroletemplatebindings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - management.cattle.io
+  resources:
   - clusters
   verbs:
   - get
