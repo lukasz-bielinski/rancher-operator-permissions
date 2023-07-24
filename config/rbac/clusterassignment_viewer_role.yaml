@@ -1,0 +1,27 @@
+# permissions for end users to view clusterassignments.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: clusterassignment-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: rancher-operator-permissions
+    app.kubernetes.io/part-of: rancher-operator-permissions
+    app.kubernetes.io/managed-by: kustomize
+  name: clusterassignment-viewer-role
+rules:
+- apiGroups:
+  - permissions.xddevelopment.com
+  resources:
+  - clusterassignments
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - permissions.xddevelopment.com
+  resources:
+  - clusterassignments/status
+  verbs:
+  - get

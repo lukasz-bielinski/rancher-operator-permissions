@@ -1,0 +1,12 @@
+apiVersion: permissions.xddevelopment.com/v1alpha1
+kind: ClusterAssignment
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterassignment
+    app.kubernetes.io/instance: clusterassignment-sample
+    app.kubernetes.io/part-of: rancher-operator-permissions
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: rancher-operator-permissions
+  name: clusterassignment-sample
+spec:
+  # TODO(user): Add fields here
