@@ -18,11 +18,8 @@ package controllers
 
 import (
 	"context"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 	"strings"
 
-	permissionsv1alpha1 "github.com/lukasz-bielinski/rancher-operator-permissions/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -84,11 +81,7 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterAssignmentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&permissionsv1alpha1.ClusterAssignment{}).
-		Watches(
-			&source.Kind{Type: &managementv3.User{}},
-			&handler.EnqueueRequestForObject{},
-		).
+		For(&managementv3.User{}).
 		Complete(r)
 }
 
