@@ -153,6 +153,7 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			RoleTemplateName:  "cluster-owner",
 			UserName:          user.Name,
 			UserPrincipalName: user.PrincipalIDs[0],
+			ClusterName:       clusterName,
 		}
 
 		// Apply the ClusterRoleTemplateBinding to the cluster.
