@@ -8,7 +8,7 @@ rules:
 - apiGroups:
   - management.cattle.io
   resources:
-  - User
+  - users
   verbs:
   - get
   - list

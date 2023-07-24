@@ -40,7 +40,7 @@ type ClusterAssignmentReconciler struct {
 //+kubebuilder:rbac:groups=permissions.xddevelopment.com,resources=clusterassignments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=permissions.xddevelopment.com,resources=clusterassignments/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=permissions.xddevelopment.com,resources=clusterassignments/finalizers,verbs=update
-//+kubebuilder:rbac:groups=management.cattle.io,resources=User,verbs=get;list;watch
+//+kubebuilder:rbac:groups=management.cattle.io,resources=users,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
