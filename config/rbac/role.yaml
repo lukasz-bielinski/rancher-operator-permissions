@@ -20,6 +20,16 @@ rules:
 - apiGroups:
   - management.cattle.io
   resources:
+  - clusters
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - management.cattle.io
+  resources:
   - users
   verbs:
   - get
