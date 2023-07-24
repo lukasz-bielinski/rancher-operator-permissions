@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 	"strings"
 
 	permissionsv1alpha1 "github.com/lukasz-bielinski/rancher-operator-permissions/api/v1alpha1"
@@ -38,6 +40,7 @@ type ClusterAssignmentReconciler struct {
 //+kubebuilder:rbac:groups=permissions.xddevelopment.com,resources=clusterassignments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=permissions.xddevelopment.com,resources=clusterassignments/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=permissions.xddevelopment.com,resources=clusterassignments/finalizers,verbs=update
+//+kubebuilder:rbac:groups=management.cattle.io,resources=User,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -82,6 +85,10 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *ClusterAssignmentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&permissionsv1alpha1.ClusterAssignment{}).
+		Watches(
+			&source.Kind{Type: &managementv3.User{}},
+			&handler.EnqueueRequestForObject{},
+		).
 		Complete(r)
 }
 

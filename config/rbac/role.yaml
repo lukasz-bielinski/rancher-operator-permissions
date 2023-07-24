@@ -6,6 +6,14 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - management.cattle.io
+  resources:
+  - User
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - permissions.xddevelopment.com
   resources:
   - clusterassignments
