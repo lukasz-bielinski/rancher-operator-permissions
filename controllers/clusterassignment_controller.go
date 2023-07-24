@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	managementv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ClusterAssignmentReconciler reconciles a ClusterAssignment object
@@ -38,41 +39,71 @@ type ClusterAssignmentReconciler struct {
 //+kubebuilder:rbac:groups=permissions.xddevelopment.com,resources=clusterassignments/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=permissions.xddevelopment.com,resources=clusterassignments/finalizers,verbs=update
 //+kubebuilder:rbac:groups=management.cattle.io,resources=users,verbs=get;list;watch
+//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
+//
+//	func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+//		// Fetch the User instance
+//		user := &managementv3.User{}
+//		err := r.Get(ctx, req.NamespacedName, user)
+//		if err != nil {
+//			// handle error
+//			return ctrl.Result{}, err
+//		}
+//
+//		// Check the user's attributes or groups to decide which clusters they should have access to.
+//		// This logic will vary greatly depending on your needs.
+//		clusters, err := determineClustersForUser(ctx, r, user)
+//		if err != nil {
+//			return ctrl.Result{}, err
+//		}
+//
+//		for _, cluster := range clusters {
+//			// Create a ClusterRoleTemplateBinding for each cluster the user should have access to.
+//			// Please check the structure of the managementv3.ClusterRoleTemplateBinding object
+//			binding := &managementv3.ClusterRoleTemplateBinding{
+//				ObjectMeta: metav1.ObjectMeta{
+//					Name:      user.Name + "-" + cluster,
+//					Namespace: "default",
+//				},
+//				// More fields might be required here
+//			}
+//
+//			// Apply the ClusterRoleTemplateBinding to the cluster.
+//			if err := r.Create(ctx, binding); err != nil {
+//				// handle error
+//				return ctrl.Result{}, err
+//			}
+//		}
+//
+//		return ctrl.Result{}, nil
+//	}
 func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Fetch the User instance
 	user := &managementv3.User{}
 	err := r.Get(ctx, req.NamespacedName, user)
 	if err != nil {
 		// handle error
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Check the user's attributes or groups to decide which clusters they should have access to.
-	// This logic will vary greatly depending on your needs.
-	clusters, err := determineClustersForUser(ctx, r, user)
-	if err != nil {
-		return ctrl.Result{}, err
+	// Create a secret with the same name and in the same namespace
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      user.Name,
+			Namespace: "default",
+		},
+		StringData: map[string]string{
+			"username": user.Name,
+			// Add more data here
+		},
 	}
 
-	for _, cluster := range clusters {
-		// Create a ClusterRoleTemplateBinding for each cluster the user should have access to.
-		// Please check the structure of the managementv3.ClusterRoleTemplateBinding object
-		binding := &managementv3.ClusterRoleTemplateBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      user.Name + "-" + cluster,
-				Namespace: "default",
-			},
-			// More fields might be required here
-		}
-
-		// Apply the ClusterRoleTemplateBinding to the cluster.
-		if err := r.Create(ctx, binding); err != nil {
-			// handle error
-			return ctrl.Result{}, err
-		}
+	if err := r.Create(ctx, secret); err != nil {
+		// handle error
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil

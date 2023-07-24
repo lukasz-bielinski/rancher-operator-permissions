@@ -121,6 +121,18 @@ metadata:
   name: rancher-operator-permissions-manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
   - management.cattle.io
   resources:
   - users
