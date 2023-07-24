@@ -39,7 +39,7 @@ type ClusterAssignmentReconciler struct {
 //+kubebuilder:rbac:groups=permissions.xddevelopment.com,resources=clusterassignments,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=permissions.xddevelopment.com,resources=clusterassignments/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=permissions.xddevelopment.com,resources=clusterassignments/finalizers,verbs=update
-//+kubebuilder:rbac:groups=management.cattle.io,resources=users,verbs=get;list;watch
+//+kubebuilder:rbac:groups=management.cattle.io,resources=users,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -86,6 +86,10 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	user := &managementv3.User{}
 	err := r.Get(ctx, req.NamespacedName, user)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// The user has been deleted. Nothing left to do.
+			return ctrl.Result{}, nil
+		}
 		// handle error
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -93,6 +97,33 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// Secret name and namespace
 	secretName := user.Name + "-test-secret"
 	secretNamespace := "default"
+
+	// Check if the user is being deleted
+	if user.DeletionTimestamp != nil {
+		// The object is being deleted
+		if contains(user.GetFinalizers(), userFinalizer) {
+			// our finalizer is present, so lets handle any external dependency
+			if err := r.deleteUserSecret(ctx, secretName, secretNamespace); err != nil {
+				// if fail to delete the external dependency here, return with error
+				// so that it can be retried
+				return ctrl.Result{}, err
+			}
+
+			// remove our finalizer from the list and update it.
+			user.SetFinalizers(remove(user.GetFinalizers(), userFinalizer))
+			if err := r.Update(context.Background(), user); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// Add finalizer for this CR
+	if !contains(user.GetFinalizers(), userFinalizer) {
+		if err := r.addFinalizer(ctx, user); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
 
 	// Check if the secret already exists
 	secretExists := &corev1.Secret{}
@@ -123,6 +154,52 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	// No error occurred
 	return ctrl.Result{}, nil
+}
+
+func (r *ClusterAssignmentReconciler) addFinalizer(ctx context.Context, user *managementv3.User) error {
+	user.SetFinalizers(append(user.GetFinalizers(), userFinalizer))
+	// Update CR
+	return r.Update(ctx, user)
+}
+
+const (
+	userFinalizer = "user.finalizers.permissions.xddevelopment.com"
+)
+
+func (r *ClusterAssignmentReconciler) deleteUserSecret(ctx context.Context, secretName, secretNamespace string) error {
+	// delete secret
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: secretNamespace,
+		},
+	}
+	err := r.Delete(ctx, secret)
+	if err != nil {
+		// it was removed already, so ignore this error
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+	}
+	return err
+}
+
+func contains(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func remove(list []string, s string) (result []string) {
+	for _, v := range list {
+		if v != s {
+			result = append(result, v)
+		}
+	}
+	return
 }
 
 // SetupWithManager sets up the controller with the Manager.
