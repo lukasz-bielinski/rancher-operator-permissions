@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	managementv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 // ClusterAssignmentReconciler reconciles a ClusterAssignment object
@@ -89,23 +90,38 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Create a secret with the same name and in the same namespace
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      user.Name,
-			Namespace: "default",
-		},
-		StringData: map[string]string{
-			"username": user.Name,
-			// Add more data here
-		},
+	// Secret name and namespace
+	secretName := user.Name + "-test-secret"
+	secretNamespace := "default"
+
+	// Check if the secret already exists
+	secretExists := &corev1.Secret{}
+	err = r.Get(ctx, client.ObjectKey{Name: secretName, Namespace: secretNamespace}, secretExists)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// The secret doesn't exist, create it
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      secretName,
+					Namespace: secretNamespace,
+				},
+				StringData: map[string]string{
+					"username": user.Name,
+					// Add more data here
+				},
+			}
+
+			if err := r.Create(ctx, secret); err != nil {
+				// handle error
+				return ctrl.Result{}, err
+			}
+		} else {
+			// Some other error occurred when trying to fetch the Secret, requeue the request
+			return ctrl.Result{}, err
+		}
 	}
 
-	if err := r.Create(ctx, secret); err != nil {
-		// handle error
-		return ctrl.Result{}, err
-	}
-
+	// No error occurred
 	return ctrl.Result{}, nil
 }
 
