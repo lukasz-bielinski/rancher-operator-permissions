@@ -1,41 +1,3 @@
-//
-//	func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-//		// Fetch the User instance
-//		user := &managementv3.User{}
-//		err := r.Get(ctx, req.NamespacedName, user)
-//		if err != nil {
-//			// handle error
-//			return ctrl.Result{}, err
-//		}
-//
-//		// Check the user's attributes or groups to decide which clusters they should have access to.
-//		// This logic will vary greatly depending on your needs.
-//		clusters, err := determineClustersForUser(ctx, r, user)
-//		if err != nil {
-//			return ctrl.Result{}, err
-//		}
-//
-//		for _, cluster := range clusters {
-//			// Create a ClusterRoleTemplateBinding for each cluster the user should have access to.
-//			// Please check the structure of the managementv3.ClusterRoleTemplateBinding object
-//			binding := &managementv3.ClusterRoleTemplateBinding{
-//				ObjectMeta: metav1.ObjectMeta{
-//					Name:      user.Name + "-" + cluster,
-//					Namespace: "default",
-//				},
-//				// More fields might be required here
-//			}
-//
-//			// Apply the ClusterRoleTemplateBinding to the cluster.
-//			if err := r.Create(ctx, binding); err != nil {
-//				// handle error
-//				return ctrl.Result{}, err
-//			}
-//		}
-//
-//		return ctrl.Result{}, nil
-//	}
-
 /*
 Copyright 2023.
 
@@ -147,7 +109,7 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// Create a ClusterRoleTemplateBinding for each cluster the user should have access to.
 		binding := &managementv3.ClusterRoleTemplateBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      user.Name + "-" + clusterName,
+				Name:      user.Name + "-" + clusterName + "operator",
 				Namespace: clusterName,
 			},
 			RoleTemplateName:  "cluster-owner",
@@ -197,11 +159,17 @@ func determineClustersForUser(ctx context.Context, r *ClusterAssignmentReconcile
 	}
 
 	clusters := make(map[string]string)
+	username := user.Username
 	for _, cluster := range clusterList.Items {
 		labels := cluster.ObjectMeta.GetLabels()
 		if ownerLabel, ok := labels["owner"]; ok {
-			if strings.Contains(ownerLabel, user.Username) {
-				clusters[cluster.Name] = cluster.Namespace
+			// Check all substrings of length 4
+			for i := 0; i <= len(username)-4; i++ {
+				substr := username[i : i+4]
+				if strings.Contains(ownerLabel, substr) {
+					clusters[cluster.Name] = cluster.Namespace
+					break
+				}
 			}
 		}
 	}
