@@ -6,17 +6,11 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - ""
+  - cluster.x-k8s.io
   resources:
-  - secrets
+  - machines
   verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
+  - '*'
 - apiGroups:
   - management.cattle.io
   resources:
@@ -36,9 +30,16 @@ rules:
   verbs:
   - get
   - list
+  - own
   - patch
   - update
   - watch
+- apiGroups:
+  - management.cattle.io
+  resources:
+  - projects
+  verbs:
+  - updatepsa
 - apiGroups:
   - management.cattle.io
   resources:
@@ -75,3 +76,29 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - provisioning.cattle.io
+  resources:
+  - clusters
+  verbs:
+  - '*'
+- apiGroups:
+  - rke-machine-config.cattle.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - rke-machine.cattle.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - rke.cattle.io
+  resources:
+  - etcdsnapshots
+  verbs:
+  - get
+  - list
+  - watch

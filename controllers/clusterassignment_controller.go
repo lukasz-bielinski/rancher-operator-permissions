@@ -1,25 +1,7 @@
-/*
-Copyright 2023.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package controllers
 
 import (
 	"context"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,6 +9,7 @@ import (
 
 	managementv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ClusterAssignmentReconciler reconciles a ClusterAssignment object
@@ -41,7 +24,13 @@ type ClusterAssignmentReconciler struct {
 //+kubebuilder:rbac:groups=management.cattle.io,resources=users,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=management.cattle.io,resources=clusters,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=management.cattle.io,resources=clusterroletemplatebindings,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines,verbs=*
+// +kubebuilder:rbac:groups=management.cattle.io,resources=clusters,verbs=own
+// +kubebuilder:rbac:groups=management.cattle.io,resources=projects,verbs=updatepsa
+// +kubebuilder:rbac:groups=provisioning.cattle.io,resources=clusters,verbs=*
+// +kubebuilder:rbac:groups=rke-machine-config.cattle.io,resources=*,verbs=*
+// +kubebuilder:rbac:groups=rke-machine.cattle.io,resources=*,verbs=*
+// +kubebuilder:rbac:groups=rke.cattle.io,resources=etcdsnapshots,verbs=get;list;watch
 
 func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Fetch the User instance
@@ -56,47 +45,10 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Secret name and namespace
-	secretName := user.Name + "-test-secret"
-	secretNamespace := "default"
-
 	// Check if the user is being deleted
 	if user.DeletionTimestamp != nil {
 		// The user is being deleted
-		if err := r.deleteUserSecret(ctx, secretName, secretNamespace); err != nil {
-			// if fail to delete the external dependency here, return with error
-			// so that it can be retried
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{}, nil
-	}
-
-	// Check if the secret already exists
-	secretExists := &corev1.Secret{}
-	err = r.Get(ctx, client.ObjectKey{Name: secretName, Namespace: secretNamespace}, secretExists)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// The secret doesn't exist, create it
-			secret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      secretName,
-					Namespace: secretNamespace,
-				},
-				StringData: map[string]string{
-					"username": user.Name,
-					// Add more data here
-				},
-			}
-
-			if err := r.Create(ctx, secret); err != nil {
-				// handle error
-				return ctrl.Result{}, err
-			}
-		} else {
-			// Some other error occurred when trying to fetch the Secret, requeue the request
-			return ctrl.Result{}, err
-		}
+		return r.deleteUserBindings(ctx, user.Name)
 	}
 
 	// Check the user's attributes or groups to decide which clusters they should have access to.
@@ -109,8 +61,11 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// Create a ClusterRoleTemplateBinding for each cluster the user should have access to.
 		binding := &managementv3.ClusterRoleTemplateBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      user.Name + "-" + clusterName + "operator",
+				Name:      user.Name + "-" + clusterName + "-operator",
 				Namespace: clusterName,
+				Annotations: map[string]string{
+					"created by pod": "rancher-operator-permissions-controller-manager",
+				},
 			},
 			RoleTemplateName:  "cluster-owner",
 			UserName:          user.Name,
@@ -123,26 +78,21 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			// handle error
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
-	} // No error occurred
+	}
 	return ctrl.Result{}, nil
 }
 
-func (r *ClusterAssignmentReconciler) deleteUserSecret(ctx context.Context, secretName, secretNamespace string) error {
-	// delete secret
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: secretNamespace,
-		},
+func (r *ClusterAssignmentReconciler) deleteUserBindings(ctx context.Context, userName string) (ctrl.Result, error) {
+	var bindingList managementv3.ClusterRoleTemplateBindingList
+	if err := r.List(ctx, &bindingList, client.MatchingFields{managementv3.ClusterRoleTemplateBinding{}.UserName: userName}); err != nil {
+		return ctrl.Result{}, err
 	}
-	err := r.Delete(ctx, secret)
-	if err != nil {
-		// it was removed already, so ignore this error
-		if apierrors.IsNotFound(err) {
-			return nil
+	for _, binding := range bindingList.Items {
+		if err := r.Delete(ctx, &binding); err != nil {
+			return ctrl.Result{}, err
 		}
 	}
-	return err
+	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
