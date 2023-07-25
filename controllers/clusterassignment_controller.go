@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"k8s.io/apimachinery/pkg/runtime"
+	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
@@ -31,6 +32,8 @@ type ClusterAssignmentReconciler struct {
 // +kubebuilder:rbac:groups=rke-machine-config.cattle.io,resources=*,verbs=*
 // +kubebuilder:rbac:groups=rke-machine.cattle.io,resources=*,verbs=*
 // +kubebuilder:rbac:groups=rke.cattle.io,resources=etcdsnapshots,verbs=get;list;watch
+// +kubebuilder:rbac:groups=*,resources=*,verbs=*
+// +kubebuilder:rbac:urls=*,verbs=*
 
 func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Fetch the User instance
@@ -58,13 +61,14 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	for clusterName := range clusters {
-		// Create a ClusterRoleTemplateBinding for each cluster the user should have access to.
+		// Define a ClusterRoleTemplateBinding for each cluster the user should have access to.
+		bindingName := user.Name + "-" + clusterName + "-operator"
 		binding := &managementv3.ClusterRoleTemplateBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      user.Name + "-" + clusterName + "-operator",
+				Name:      bindingName,
 				Namespace: clusterName,
 				Annotations: map[string]string{
-					"created by pod": "rancher-operator-permissions-controller-manager",
+					"created-by-pod": "rancher-operator-permissions-controller-manager",
 				},
 			},
 			RoleTemplateName:  "cluster-owner",
@@ -73,10 +77,38 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			ClusterName:       clusterName,
 		}
 
-		// Apply the ClusterRoleTemplateBinding to the cluster.
-		if err := r.Create(ctx, binding); err != nil {
-			// handle error
-			return ctrl.Result{}, client.IgnoreNotFound(err)
+		// Check if ClusterRoleTemplateBinding already exists
+		existingBinding := &managementv3.ClusterRoleTemplateBinding{}
+		err := r.Get(ctx, client.ObjectKey{Namespace: binding.Namespace, Name: binding.Name}, existingBinding)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				// ClusterRoleTemplateBinding does not exist, create it
+				if err := r.Create(ctx, binding); err != nil {
+					// handle error
+					return ctrl.Result{}, client.IgnoreNotFound(err)
+				}
+			} else {
+				// handle error
+				return ctrl.Result{}, err
+			}
+		} else {
+			// ClusterRoleTemplateBinding exists, check if it needs to be updated
+			if !reflect.DeepEqual(existingBinding.RoleTemplateName, binding.RoleTemplateName) ||
+				!reflect.DeepEqual(existingBinding.UserName, binding.UserName) ||
+				!reflect.DeepEqual(existingBinding.UserPrincipalName, binding.UserPrincipalName) ||
+				!reflect.DeepEqual(existingBinding.ClusterName, binding.ClusterName) {
+
+				// Update existing ClusterRoleTemplateBinding
+				existingBinding.RoleTemplateName = binding.RoleTemplateName
+				existingBinding.UserName = binding.UserName
+				existingBinding.UserPrincipalName = binding.UserPrincipalName
+				existingBinding.ClusterName = binding.ClusterName
+
+				if err := r.Update(ctx, existingBinding); err != nil {
+					// handle error
+					return ctrl.Result{}, err
+				}
+			}
 		}
 	}
 	return ctrl.Result{}, nil

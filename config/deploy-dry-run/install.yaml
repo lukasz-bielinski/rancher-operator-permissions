@@ -120,6 +120,16 @@ metadata:
   creationTimestamp: null
   name: rancher-operator-permissions-manager-role
 rules:
+- nonResourceURLs:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - '*'
+  resources:
+  - '*'
+  verbs:
+  - '*'
 - apiGroups:
   - cluster.x-k8s.io
   resources:
