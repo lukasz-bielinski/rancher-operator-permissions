@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	managementv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -45,6 +46,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(permissionsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(managementv3.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

@@ -5,6 +5,61 @@ metadata:
   creationTimestamp: null
   name: manager-role
 rules:
+- nonResourceURLs:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - '*'
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - cluster.x-k8s.io
+  resources:
+  - machines
+  verbs:
+  - '*'
+- apiGroups:
+  - management.cattle.io
+  resources:
+  - clusterroletemplatebindings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - management.cattle.io
+  resources:
+  - clusters
+  verbs:
+  - get
+  - list
+  - own
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - management.cattle.io
+  resources:
+  - projects
+  verbs:
+  - updatepsa
+- apiGroups:
+  - management.cattle.io
+  resources:
+  - users
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - permissions.xddevelopment.com
   resources:
@@ -31,3 +86,29 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - provisioning.cattle.io
+  resources:
+  - clusters
+  verbs:
+  - '*'
+- apiGroups:
+  - rke-machine-config.cattle.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - rke-machine.cattle.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - rke.cattle.io
+  resources:
+  - etcdsnapshots
+  verbs:
+  - get
+  - list
+  - watch
