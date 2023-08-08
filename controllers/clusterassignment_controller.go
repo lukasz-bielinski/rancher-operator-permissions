@@ -2,15 +2,14 @@ package controllers
 
 import (
 	"context"
+	managementv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
-
-	managementv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ClusterAssignmentReconciler reconciles a ClusterAssignment object
@@ -54,6 +53,19 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return r.deleteUserBindings(ctx, user.Name)
 	}
 
+	var roleTemplate string
+	switch {
+	case contains(user.Name, "CLUSTER-ADMIN"):
+		roleTemplate = "cluster-admin"
+	case contains(user.Name, "CLUSTER-AUDITOR"):
+		roleTemplate = "read-only"
+	case contains(user.Name, "DEVELOPER"):
+		roleTemplate = "projects-create"
+	default:
+		// If no matches, you can set a default or skip processing.
+		roleTemplate = "default-role"
+	}
+
 	// Check the user's attributes or groups to decide which clusters they should have access to.
 	clusters, err := determineClustersForUser(ctx, r, user)
 	if err != nil {
@@ -62,7 +74,7 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	for clusterName := range clusters {
 		// Define a ClusterRoleTemplateBinding for each cluster the user should have access to.
-		bindingName := user.Name + "-" + clusterName + "-operator"
+		bindingName := user.Name + "-" + clusterName + "-" + roleTemplate
 		binding := &managementv3.ClusterRoleTemplateBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      bindingName,
@@ -71,7 +83,7 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 					"created-by-pod": "rancher-operator-permissions-controller-manager",
 				},
 			},
-			RoleTemplateName:  "cluster-owner",
+			RoleTemplateName:  roleTemplate,
 			UserName:          user.Name,
 			UserPrincipalName: user.PrincipalIDs[0],
 			ClusterName:       clusterName,
@@ -134,27 +146,7 @@ func (r *ClusterAssignmentReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func determineClustersForUser(ctx context.Context, r *ClusterAssignmentReconciler, user *managementv3.User) (map[string]string, error) {
-	var clusterList managementv3.ClusterList
-	if err := r.List(ctx, &clusterList); err != nil {
-		return nil, err
-	}
-
-	clusters := make(map[string]string)
-	username := user.Username
-	for _, cluster := range clusterList.Items {
-		labels := cluster.ObjectMeta.GetLabels()
-		if ownerLabel, ok := labels["owner"]; ok {
-			// Check all substrings of length 4
-			for i := 0; i <= len(username)-4; i++ {
-				substr := username[i : i+4]
-				if strings.Contains(ownerLabel, substr) {
-					clusters[cluster.Name] = cluster.Namespace
-					break
-				}
-			}
-		}
-	}
-
-	return clusters, nil
+// Helper function to check if a string contains a substring.
+func contains(s, substr string) bool {
+	return strings.Contains(s, substr)
 }
