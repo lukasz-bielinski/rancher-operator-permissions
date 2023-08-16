@@ -18,11 +18,12 @@ func determineClustersForUser(ctx context.Context, r *ClusterAssignmentReconcile
 	for _, cluster := range clusterList.Items {
 		labels := cluster.ObjectMeta.GetLabels()
 		if ownerLabel, ok := labels["owner"]; ok {
-			// Check all substrings of length 15
-			for i := 0; i <= len(username)-15; i++ {
-				substr := username[i : i+15]
+			// Check all substrings of length 5
+			for i := 0; i <= len(username)-5; i++ {
+				substr := username[i : i+5]
 				if strings.Contains(ownerLabel, substr) {
 					clusters[cluster.Name] = cluster.Namespace
+					globalLog.Info("Matching cluster found", "cluster", cluster.Name, "display name ", cluster.Spec.DisplayName)
 					break
 				}
 			}
