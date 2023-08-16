@@ -17,7 +17,7 @@ func (r *ClusterAssignmentReconciler) deleteUserBindings(ctx context.Context, Us
 	// Filter out objects based on annotations and name
 	toDelete := []*managementv3.ClusterRoleTemplateBinding{}
 	for _, binding := range bindingList.Items {
-		if binding.Name == Username {
+		if binding.UserName == Username {
 			annotationValue, hasAnnotation := binding.Annotations["created-by-pod"]
 			if hasAnnotation && annotationValue == "rancher-operator-permissions-controller-manager" {
 				toDelete = append(toDelete, &binding)
