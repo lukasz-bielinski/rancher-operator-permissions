@@ -6,7 +6,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-func (r *ClusterAssignmentReconciler) deleteUserBindings(ctx context.Context, Name string) (ctrl.Result, error) {
+func (r *ClusterAssignmentReconciler) deleteUserBindings(ctx context.Context, Username string) (ctrl.Result, error) {
 	var bindingList managementv3.ClusterRoleTemplateBindingList
 
 	// List all ClusterRoleTemplateBindings
@@ -17,11 +17,11 @@ func (r *ClusterAssignmentReconciler) deleteUserBindings(ctx context.Context, Na
 	// Filter out objects based on annotations and name
 	toDelete := []*managementv3.ClusterRoleTemplateBinding{}
 	for _, binding := range bindingList.Items {
-		annotationValue, hasAnnotation := binding.Annotations["created-by-pod"]
-		if hasAnnotation && annotationValue == "rancher-operator-permissions-controller-manager" {
-			toDelete = append(toDelete, &binding)
-		} else if !hasAnnotation && binding.Name == Name {
-			toDelete = append(toDelete, &binding)
+		if binding.Name == Username {
+			annotationValue, hasAnnotation := binding.Annotations["created-by-pod"]
+			if hasAnnotation && annotationValue == "rancher-operator-permissions-controller-manager" {
+				toDelete = append(toDelete, &binding)
+			}
 		}
 	}
 

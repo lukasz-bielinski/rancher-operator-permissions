@@ -134,6 +134,7 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 						globalLog.Info("Updated ClusterRoleTemplateBinding", "Name", bindingName, "Namespace", clusterName)
 					}
 				}
+
 			}
 		} else {
 			globalLog.Info("Failed to find role name in field user.Username", "user.Username", user.Username)
