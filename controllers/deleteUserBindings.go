@@ -8,6 +8,7 @@ import (
 
 func (r *ClusterAssignmentReconciler) deleteUserBindings(ctx context.Context, Username string) (ctrl.Result, error) {
 	var bindingList managementv3.ClusterRoleTemplateBindingList
+	globalLog.Info("Starting deleteUserBindings method...")
 
 	// List all ClusterRoleTemplateBindings
 	if err := r.List(ctx, &bindingList); err != nil {
@@ -27,11 +28,10 @@ func (r *ClusterAssignmentReconciler) deleteUserBindings(ctx context.Context, Us
 
 	// Now, we'll delete the filtered objects
 	for _, binding := range toDelete {
+		globalLog.Info("Attempting to delete ClusterRoleTemplateBinding", "name", binding.Name, "namespace", binding.Namespace)
 		if err := r.Delete(ctx, binding); err != nil {
-			globalLog.Info("Error deleting ClusterRoleTemplateBinding", "name", binding.Name, "namespace", binding.Namespace, "error", err)
+			globalLog.Error(err, "Error deleting ClusterRoleTemplateBinding", "name", binding.Name, "namespace", binding.Namespace)
 			return ctrl.Result{}, err
-		} else {
-			globalLog.Info("Deleted ClusterRoleTemplateBinding", "name", binding.Name, "namespace", binding.Namespace)
 		}
 	}
 
