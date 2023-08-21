@@ -153,9 +153,9 @@ rules:
   resources:
   - clusters
   verbs:
+  - '*'
   - get
   - list
-  - own
   - patch
   - update
   - watch
@@ -164,7 +164,7 @@ rules:
   resources:
   - projects
   verbs:
-  - updatepsa
+  - update
 - apiGroups:
   - management.cattle.io
   resources:
