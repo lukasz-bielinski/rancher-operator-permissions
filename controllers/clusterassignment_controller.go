@@ -28,8 +28,8 @@ type ClusterAssignmentReconciler struct {
 //+kubebuilder:rbac:groups=management.cattle.io,resources=clusters,verbs=get;list;watch;update;patch
 //+kubebuilder:rbac:groups=management.cattle.io,resources=clusterroletemplatebindings,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines,verbs=*
-// +kubebuilder:rbac:groups=management.cattle.io,resources=clusters,verbs=own
-// +kubebuilder:rbac:groups=management.cattle.io,resources=projects,verbs=updatepsa
+// +kubebuilder:rbac:groups=management.cattle.io,resources=clusters,verbs=*
+// +kubebuilder:rbac:groups=management.cattle.io,resources=projects,verbs=update
 // +kubebuilder:rbac:groups=provisioning.cattle.io,resources=clusters,verbs=*
 // +kubebuilder:rbac:groups=rke-machine-config.cattle.io,resources=*,verbs=*
 // +kubebuilder:rbac:groups=rke-machine.cattle.io,resources=*,verbs=*
@@ -56,6 +56,7 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return r.deleteUserBindings(ctx, user.Username)
 	}
 
+	// Default roleTemplates
 	roleTemplates := []struct {
 		substring    string
 		roleTemplate string
@@ -63,6 +64,19 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		{"cluster-admin", "cluster-admin"},
 		{"cluster-auditor", "read-only"},
 		{"developer", "projects-create"},
+	}
+
+	// Try to load from an external file, e.g., "roleTemplates.json"
+	data, err := readFileIfExists("/config/roleTemplates.json")
+	if err == nil {
+		externalRoleTemplates, err := parseRoleTemplatesFile(data)
+		if err == nil && len(externalRoleTemplates) > 0 {
+			roleTemplates = externalRoleTemplates
+		} else {
+			globalLog.Error(err, "Failed to parse role templates file. Using defaults.")
+		}
+	} else {
+		globalLog.Info("No external role templates file found. Using defaults.")
 	}
 
 	// Check the user's attributes or groups to decide which clusters they should have access to.
