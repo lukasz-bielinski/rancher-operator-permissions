@@ -70,7 +70,6 @@ spec:
         - /manager
         args:
         - --leader-elect
-        - --zap-log-level=debug
         image: controller:latest
         imagePullPolicy: Always
         name: manager
