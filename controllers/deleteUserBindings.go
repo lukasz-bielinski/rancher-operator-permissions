@@ -18,7 +18,7 @@ func (r *ClusterAssignmentReconciler) deleteUserBindings(ctx context.Context, Us
 	// Filter out objects based on annotations and name
 	toDelete := []*managementv3.ClusterRoleTemplateBinding{}
 	for _, binding := range bindingList.Items {
-		globalLog.Info("Checking binding", "UserName", binding.UserName, "Annotations", binding.Annotations)
+		globalLog.V(1).Info("Checking binding", "UserName", binding.UserName, "Annotations", binding.Annotations)
 
 		if binding.UserName == Username {
 			annotationValue, hasAnnotation := binding.Annotations["created-by-pod"]
