@@ -86,7 +86,7 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 	if len(user.PrincipalIDs) == 0 {
-		globalLog.Info("User does not have yet any PrincipalIDs", "user", user.Name)
+		globalLog.V(1).Info("User does not have yet any PrincipalIDs", "user", user.Name)
 		return ctrl.Result{}, nil
 	}
 	for _, rt := range roleTemplates {
@@ -108,50 +108,51 @@ func (r *ClusterAssignmentReconciler) Reconcile(ctx context.Context, req ctrl.Re
 					ClusterName:       clusterName,
 				}
 
-				// Check if ClusterRoleTemplateBinding already exists
-				existingBinding := &managementv3.ClusterRoleTemplateBinding{}
-				err := r.Get(ctx, client.ObjectKey{Namespace: binding.Namespace, Name: binding.Name}, existingBinding)
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						// ClusterRoleTemplateBinding does not exist, create it
-						if err := r.Create(ctx, binding); err != nil {
+				// Try to create the ClusterRoleTemplateBinding
+				if err := r.Create(ctx, binding); err != nil {
+					if apierrors.IsAlreadyExists(err) {
+						// If it already exists, then update it
+						existingBinding := &managementv3.ClusterRoleTemplateBinding{}
+						err := r.Get(ctx, client.ObjectKey{Namespace: binding.Namespace, Name: binding.Name}, existingBinding)
+						if err != nil {
 							// Log error
-							globalLog.Error(err, "Failed to create ClusterRoleTemplateBinding")
-							return ctrl.Result{}, client.IgnoreNotFound(err)
+							globalLog.Error(err, "Failed to get ClusterRoleTemplateBinding for update")
+							return ctrl.Result{}, err
 						}
-						// Log success
-						globalLog.Info("Created ClusterRoleTemplateBinding", "Name", bindingName, "Namespace", clusterName)
+
+						// Check if it needs to be updated
+						if !reflect.DeepEqual(existingBinding.RoleTemplateName, binding.RoleTemplateName) ||
+							!reflect.DeepEqual(existingBinding.UserName, binding.UserName) ||
+							!reflect.DeepEqual(existingBinding.UserPrincipalName, binding.UserPrincipalName) ||
+							!reflect.DeepEqual(existingBinding.ClusterName, binding.ClusterName) {
+
+							existingBinding.RoleTemplateName = binding.RoleTemplateName
+							existingBinding.UserName = binding.UserName
+							existingBinding.UserPrincipalName = binding.UserPrincipalName
+							existingBinding.ClusterName = binding.ClusterName
+
+							if err := r.Update(ctx, existingBinding); err != nil {
+								// Log error
+								globalLog.Error(err, "Failed to update ClusterRoleTemplateBinding")
+								return ctrl.Result{}, err
+							}
+
+							// Log success of update
+							globalLog.Info("Updated ClusterRoleTemplateBinding", "Name", binding.Name, "Namespace", binding.Namespace)
+						}
 					} else {
-						// Log error
-						globalLog.Error(err, "Failed to get ClusterRoleTemplateBinding")
+						// Handle other errors from the create operation
+						globalLog.Error(err, "Failed to create ClusterRoleTemplateBinding")
 						return ctrl.Result{}, err
 					}
 				} else {
-					// ClusterRoleTemplateBinding exists, check if it needs to be updated
-					if !reflect.DeepEqual(existingBinding.RoleTemplateName, binding.RoleTemplateName) ||
-						!reflect.DeepEqual(existingBinding.UserName, binding.UserName) ||
-						!reflect.DeepEqual(existingBinding.UserPrincipalName, binding.UserPrincipalName) ||
-						!reflect.DeepEqual(existingBinding.ClusterName, binding.ClusterName) {
-
-						// Update existing ClusterRoleTemplateBinding
-						existingBinding.RoleTemplateName = binding.RoleTemplateName
-						existingBinding.UserName = binding.UserName
-						existingBinding.UserPrincipalName = binding.UserPrincipalName
-						existingBinding.ClusterName = binding.ClusterName
-
-						if err := r.Update(ctx, existingBinding); err != nil {
-							// Log error
-							globalLog.Error(err, "Failed to update ClusterRoleTemplateBinding")
-							return ctrl.Result{}, err
-						}
-						// Log success
-						globalLog.Info("Updated ClusterRoleTemplateBinding", "Name", bindingName, "Namespace", clusterName)
-					}
+					// Log success of creation
+					globalLog.Info("Created ClusterRoleTemplateBinding", "Name", binding.Name, "Namespace", binding.Namespace)
 				}
 
 			}
 		} else {
-			globalLog.Info("Failed to find role name in field user.Username", "user.Username", user.Username)
+			globalLog.V(1).Info("Failed to find role name in field user.Username", "user.Username", user.Username)
 		}
 	}
 	return ctrl.Result{}, nil

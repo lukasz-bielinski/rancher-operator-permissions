@@ -23,7 +23,7 @@ func determineClustersForUser(ctx context.Context, r *ClusterAssignmentReconcile
 				substr := username[i : i+5]
 				if strings.Contains(ownerLabel, substr) {
 					clusters[cluster.Name] = cluster.Namespace
-					globalLog.Info("Matching cluster found", "cluster", cluster.Name, "display name ", cluster.Spec.DisplayName)
+					globalLog.V(1).Info("Matching cluster found", "cluster", cluster.Name, "display name ", cluster.Spec.DisplayName)
 					break
 				}
 			}
