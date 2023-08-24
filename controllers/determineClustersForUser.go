@@ -7,6 +7,7 @@ import (
 	managementv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
+// TODO: This should be updated later according to SSO integration
 func determineClustersForUser(ctx context.Context, r *ClusterAssignmentReconciler, user *managementv3.User) (map[string]string, error) {
 	var clusterList managementv3.ClusterList
 	if err := r.List(ctx, &clusterList); err != nil {
