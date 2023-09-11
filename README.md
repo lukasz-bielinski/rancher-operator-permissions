@@ -1,94 +1,105 @@
-# rancher-operator-permissions    
-Goal of this operator is to map rancher users to particular clusters. Matching will be based on groups inherited from sso login by using some naming patterns.    
+# Building and Deploying the Rancher User Role Operator
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+## Introduction
 
-## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+The Rancher User Role Operator, also known as the ClusterAssignment Operator, is a specialized Kubernetes operator designed to seamlessly manage permissions and role assignments for users within a Rancher environment. As Kubernetes clusters dynamically evolve, user roles need constant adaptation. This operator ensures that users are granted permissions consistent with their attributes, and role assignments are maintained even amid environment changes.
 
-### Running on the cluster
-1. Install Instances of Custom Resources:
+The operator achieves this by watching changes in User resources, evaluating roles based on user attributes or groups, and subsequently updating the ClusterRoleTemplateBinding resources.
 
-```sh
-kubectl apply -f config/samples/
-```
+## Importance
 
-2. Build and push your image to the location specified by `IMG`:
+- **Consistency**: Ensures role assignments align with the current state of the environment and user attributes.
+- **Dynamism**: Adapts user permissions in real-time as the Kubernetes environment undergoes changes.
+- **Granularity**: Assigns roles based on detailed templates and user attributes, allowing for precise access control.
+- **Ease of Management**: Minimizes administrative overhead by automating role binding updates upon user permission changes or new user addition.
 
-```sh
-make docker-build docker-push IMG=<some-registry>/rancher-operator-permissions:tag
-```
+## Architecture
 
-3. Deploy the controller to the cluster with the image specified by `IMG`:
+![diagram.png](diagram.png)
 
-```sh
-make deploy IMG=<some-registry>/rancher-operator-permissions:tag
-```
+## Workflow and Key Components
 
-### Uninstall CRDs
-To delete the CRDs from the cluster:
+- **ClusterAssignmentReconciler**: This is the core reconciler responsible for observing User objects. Every reconciliation loop inspects the user's state and updates role bindings accordingly.
+- **Role Templates**: Default role templates, such as cluster-admin, cluster-auditor, and developer, are employed to assign roles to users. Additionally, there's the flexibility to load external role templates from a file.
+- **Helper Functions**:
+    - `contains`: Checks for the presence of a substring within a string.
+    - `readFileIfExists`: Reads content from a file if it exists.
+    - `parseRoleTemplatesFile`: Processes the role templates JSON file to extract role mappings.
+- **Reconciliation Cycle**: Upon detecting changes to User custom resources:
+    - The user corresponding to the change is fetched.
+    - Role bindings get updated or deleted based on the user's state.
+    - The necessary ClusterRoleTemplateBinding resources for the user are either created or updated.
+- **Role Template Loading**: Either uses default templates or loads from an external JSON file (roleTemplates.json).
+- **Binding Creation/Update & Deletion**: ClusterRoleTemplateBinding resources are managed based on user attributes and role templates.
+- **Configuration**: A configuration file `/config/roleTemplates.json` can be used to customize role templates.
 
-```sh
-make uninstall
-```
+## Permissions
 
-### Undeploy controller
-UnDeploy the controller from the cluster:
+This operator leans heavily on the `management.cattle.io/v3` API and permissions to ensure a smooth integration with Rancher resources. The extensive RBAC permissions spread across various resources allow the operator to manage users, clusters, role bindings, and other affiliated resources.
 
-```sh
-make undeploy
-```
+## Logging
 
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+The codebase utilizes a global logger, `globalLog`, to disseminate information, warnings, and errors. Diverse logging levels provide fine-grained control over log verbosity.
 
-### How it works
-This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
+## Future Work (TODO)
 
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/),
-which provide a reconcile function responsible for synchronizing resources until the desired state is reached on the cluster.
+- Enhance the `determineClustersForUser` function to better integrate with Single Sign-On (SSO) capabilities.
 
-### Test It Out
-1. Install the CRDs into the cluster:
+## Deployment Steps
 
-```sh
-make install
-```
+**Generate Manifest for Kustomize**:
 
-2. Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
-
-```sh
-make run
-```
-
-**NOTE:** You can also run this in one step by running: `make install run`
-
-### Modifying the API definitions
-If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
-
-```sh
+```bash
 make manifests
 ```
+- Description: Generates required manifests for Kustomize deployment.
 
-**NOTE:** Run `make --help` for more information on all potential `make` targets
+**Build and Push Docker Image**:
 
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+```bash
+make docker-build docker-push
+```
+- Description: Compiles the operator code, produces the Docker image, and pushes the image to a designated Docker registry.
 
-## License
+**Deploy with a Dry-Run**:
 
-Copyright 2023.
+```bash
+make deploy-dry-run
+```
+- Description: Simulates a deployment, creating a file(config/deploy-dry-run/install.yaml) containing all Kubernetes objects needed for deployment.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+## User Permissions Matrix in Rancher
 
-    http://www.apache.org/licenses/LICENSE-2.0
+| Action/Resource | cluster-admin | cluster-auditor (read-only) | developer (projects-create) |
+|-----------------|:-------------:|:---------------------------:|:---------------------------:|
+| **Clusters**    |               |                             |                             |
+| Create          |       ✓       |                             |                             |
+| Read            |       ✓       |              ✓              |              ✓              |
+| Update          |       ✓       |                             |                             |
+| Delete          |       ✓       |                             |                             |
+| **Projects**    |               |                             |                             |
+| Create          |       ✓       |                             |              ✓              |
+| Read            |       ✓       |              ✓              |              ✓              |
+| Update          |       ✓       |                             |              ✓              |
+| Delete          |       ✓       |                             |                             |
+| **Nodes**       |               |                             |                             |
+| Create          |       ✓       |                             |                             |
+| Read            |       ✓       |              ✓              |              ✓              |
+| Update          |       ✓       |                             |                             |
+| Delete          |       ✓       |                             |                             |
+| **Workloads**   |               |                             |                             |
+| Create          |       ✓       |                             |              ✓              |
+| Read            |       ✓       |              ✓              |              ✓              |
+| Update          |       ✓       |                             |              ✓              |
+| Delete          |       ✓       |                             |                             |
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+### Description:
 
+1. **cluster-admin**:
+    - This is a superuser role within Rancher and typically grants all permissions to clusters, projects, nodes, and workloads. They can perform CRUD (Create, Read, Update, Delete) operations on most, if not all, resources.
+
+2. **cluster-auditor (read-only)**:
+    - As the name suggests, this role is primarily focused on viewing resources without making any modifications. This is useful for users who need oversight or auditing capabilities but shouldn't change the system's configuration.
+
+3. **developer (projects-create)**:
+    - Users with this role can create projects, which are collections of namespaces in Rancher. In addition to creating projects, they can also read and potentially update them. They might also have visibility into workloads and nodes, but their primary capability is related to project management.
